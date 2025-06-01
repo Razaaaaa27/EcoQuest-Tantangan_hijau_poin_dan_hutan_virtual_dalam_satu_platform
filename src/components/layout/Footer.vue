@@ -1,5 +1,5 @@
 <template>
-  <footer class="footer">
+  <footer v-if="!isAdmin" class="footer">
     <div class="container">
       <div class="footer-content">
         <div class="footer-section">
@@ -72,7 +72,7 @@
       
       <div class="footer-bottom">
         <div class="copyright">
-          &copy; {{ currentYear }} EcoQuest. Hak Cipta Dilindungi.
+          © {{ currentYear }} EcoQuest. Hak Cipta Dilindungi.
         </div>
         <div class="footer-policy-links">
           <a href="#">Kebijakan Privasi</a>
@@ -83,8 +83,9 @@
     </div>
   </footer>
 </template>
-
 <script>
+import { mapGetters } from 'vuex'
+
 export default {
   name: 'Footer',
   data() {
@@ -108,6 +109,12 @@ export default {
   computed: {
     currentYear() {
       return new Date().getFullYear()
+    },
+    ...mapGetters({
+      currentUser: 'user/getCurrentUser' // Assuming this is the getter name from your Vuex store
+    }),
+    isAdmin() {
+      return this.currentUser && this.currentUser.role === 'admin'
     }
   }
 }

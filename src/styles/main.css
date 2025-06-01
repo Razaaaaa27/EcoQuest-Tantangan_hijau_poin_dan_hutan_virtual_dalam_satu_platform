@@ -1,6 +1,40 @@
 @import './variables.css';
 @import './components.css';
 
+
+:root {
+  --hero-bg-color: #f0f8f1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hero-bg-color: #1f1f1f;
+  }
+}
+
+.scroll-wrapper {
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+}
+
+.performers-grid.scrolling {
+  display: flex;
+  gap: 1rem;
+  width: max-content;
+  animation: scroll-left 25s linear infinite;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+
 /* Reset & Base Styles */
 * {
   margin: 0;
@@ -165,6 +199,7 @@ img {
   --text-secondary: var(--dark-text-secondary);
   --text-heading: var(--dark-text-heading);
   --border-color: var(--dark-border-color);
+  --hero-bg-color: #1f1f1f;
 }
 
 /* Animations */

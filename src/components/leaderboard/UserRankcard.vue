@@ -1,17 +1,21 @@
 <template>
   <div class="user-rank-card" :class="{ 'current-user': isCurrentUser, 'top-3': isTop3 }">
-    <div class="rank-position" :class="rankClass">{{ position }}</div>
+    <div class="rank-position" :class="rankClass">{{ position || 0 }}</div>
     
     <div class="user-info">
-      <img :src="user.avatar" :alt="user.username" class="user-avatar" />
+      <img 
+        :src="user?.avatar || '/default-avatar.png'" 
+        :alt="user?.username || 'User'" 
+        class="user-avatar" 
+      />
       <div class="user-details">
         <div class="username">
-          {{ user.username }}
+          {{ user?.username || 'Unknown User' }}
           <span v-if="isCurrentUser" class="current-user-badge">Kamu</span>
         </div>
         <div class="user-stats">
-          <div class="user-level">Level {{ user.level }}</div>
-          <div class="user-badge-count" v-if="user.badges && user.badges.length">
+          <div class="user-level">Level {{ user?.level || 1 }}</div>
+          <div class="user-badge-count" v-if="user?.badges && user.badges.length">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M20,16V10H22V16A2,2 0 0,1 20,18H8C6.89,18 6,17.1 6,16V4C6,2.89 6.89,2 8,2H16V4H8V16H20M10.91,7.08L14,10.17L20.59,3.58L22,5L14,13L9.5,8.5L10.91,7.08M16,20V22H4A2,2 0 0,1 2,20V7H4V20H16Z" />
             </svg>
@@ -22,7 +26,7 @@
     </div>
     
     <div class="user-points">
-      <div class="points-value">{{ formatNumber(user.points) }}</div>
+      <div class="points-value">{{ formatNumber(getUserPoints()) }}</div>
       <div class="points-label">poin</div>
     </div>
     
@@ -38,11 +42,13 @@ export default {
   props: {
     user: {
       type: Object,
-      required: true
+      required: true,
+      default: () => ({})
     },
     position: {
       type: Number,
-      required: true
+      required: true,
+      default: 0
     },
     isCurrentUser: {
       type: Boolean,
@@ -55,7 +61,7 @@ export default {
   },
   computed: {
     isTop3() {
-      return this.position <= 3
+      return this.position <= 3 && this.position > 0
     },
     rankClass() {
       if (this.position === 1) return 'rank-gold'
@@ -65,13 +71,39 @@ export default {
     }
   },
   methods: {
-    formatNumber(num) {
-      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+    getUserPoints() {
+      // Prioritas: gameStats.totalPoints > points > 0
+      if (this.user?.gameStats?.totalPoints !== undefined && this.user.gameStats.totalPoints !== null) {
+        return this.user.gameStats.totalPoints
+      }
+      if (this.user?.points !== undefined && this.user.points !== null) {
+        return this.user.points
+      }
+      return 0
     },
+    
+    formatNumber(num) {
+      // Handle semua kemungkinan nilai yang invalid
+      if (num === null || num === undefined || num === '' || isNaN(num)) {
+        return '0'
+      }
+      
+      // Konversi ke number jika berupa string
+      const numValue = typeof num === 'string' ? parseFloat(num) : Number(num)
+      
+      // Double check setelah konversi
+      if (isNaN(numValue)) {
+        return '0'
+      }
+      
+      return numValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+    },
+    
     getBadgeIcon(position) {
-      if (position === 1) return '/src/assets/images/badge-gold.svg'
-      if (position === 2) return '/src/assets/images/badge-silver.svg'
-      if (position === 3) return '/src/assets/images/badge-bronze.svg'
+      // Gunakan @ untuk Vite/Vue CLI asset handling
+      if (position === 1) return '@/assets/images/badge-gold.svg'
+      if (position === 2) return '@/assets/images/badge-silver.svg'
+      if (position === 3) return '@/assets/images/badge-bronze.svg'
       return ''
     }
   }

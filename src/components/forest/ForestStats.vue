@@ -57,7 +57,7 @@
     <div class="forest-progress">
       <div class="progress-header">
         <div class="progress-title">Level Hutan Berikutnya</div>
-        <div class="progress-value">{{ stats.nextLevelProgress }}%</div>
+        <div class="progress-value">{{ Math.round(stats.nextLevelProgress) }}%</div>
       </div>
       <div class="progress">
         <div class="progress-bar" :style="{ width: stats.nextLevelProgress + '%' }"></div>
@@ -67,7 +67,7 @@
       </div>
     </div>
     
-    <div class="forest-achievements">
+    <div class="forest-achievements" v-if="stats.achievements && stats.achievements.length > 0">
       <div class="achievements-title">Pencapaian Hutan</div>
       <div class="achievements-list">
         <div 
@@ -77,16 +77,19 @@
           :class="{ 'achieved': achievement.achieved }"
         >
           <div class="achievement-icon">
-            <svg v-if="achievement.achieved" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <svg v-if="achievement.achieved" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
             </svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
             </svg>
           </div>
           <div class="achievement-details">
             <div class="achievement-name">{{ achievement.name }}</div>
             <div class="achievement-description">{{ achievement.description }}</div>
+            <div v-if="achievement.achieved && achievement.achievedAt" class="achievement-date">
+              Diraih pada {{ formatDate(achievement.achievedAt) }}
+            </div>
           </div>
         </div>
       </div>
@@ -106,14 +109,24 @@ export default {
         forestLevel: 1,
         lastTreeDate: '-',
         nextLevelProgress: 0,
-        treesToNextLevel: 0,
+        treesToNextLevel: 5,
         achievements: []
       })
     }
   },
   methods: {
     formatNumber(num) {
+      if (!num) return '0'
       return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+    },
+    formatDate(dateString) {
+      if (!dateString) return ''
+      const date = new Date(dateString)
+      return date.toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      })
     }
   }
 }

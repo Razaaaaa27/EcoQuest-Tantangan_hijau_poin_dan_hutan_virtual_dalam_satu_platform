@@ -12,7 +12,7 @@
               type="text" 
               placeholder="Cari materi edukasi..." 
               v-model="searchQuery"
-              @input="filterContent"
+              @input="debounceSearch"
             />
           </div>
         </div>
@@ -24,7 +24,7 @@
           :key="tab.value"
           class="tab-btn" 
           :class="{ 'active': activeTab === tab.value }"
-          @click="activeTab = tab.value"
+          @click="setActiveTab(tab.value)"
         >
           {{ tab.label }}
         </button>
@@ -42,11 +42,22 @@
         </div>
         
         <div class="filter-group">
+          <label for="difficulty-filter">Tingkat Kesulitan:</label>
+          <select id="difficulty-filter" v-model="filters.difficulty" @change="filterContent">
+            <option value="">Semua</option>
+            <option value="beginner">Pemula</option>
+            <option value="intermediate">Menengah</option>
+            <option value="advanced">Lanjut</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
           <label for="sort-by">Urutkan:</label>
-          <select id="sort-by" v-model="filters.sortBy" @change="filterContent">
-            <option value="newest">Terbaru</option>
-            <option value="oldest">Terlama</option>
-            <option value="popular">Paling Populer</option>
+          <select id="sort-by" v-model="filters.sort" @change="filterContent">
+            <option value="-createdAt">Terbaru</option>
+            <option value="createdAt">Terlama</option>
+            <option value="-views">Paling Populer</option>
+            <option value="title">A-Z</option>
           </select>
         </div>
       </div>
@@ -56,7 +67,7 @@
         <p>Memuat materi edukasi...</p>
       </div>
       
-      <div v-else-if="filteredContent.length === 0" class="empty-state">
+      <div v-else-if="content.length === 0" class="empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12,3C7.79,3 3.7,4.41 0.38,7C4.41,12.06 7.89,16.37 12,21.5C16.08,16.42 20.24,11.24 23.65,7C20.32,4.41 16.22,3 12,3M12,5C15.07,5 18.09,5.86 20.71,7.45L20.27,7.93C18.28,10.27 15.39,13.54 12,17.3C8.6,13.53 5.71,10.25 3.72,7.93L3.29,7.45C5.91,5.86 8.93,5 12,5Z" />
         </svg>
@@ -67,14 +78,16 @@
       
       <div v-else class="ecoedu-grid">
         <EduCard 
-          v-for="item in filteredContent" 
-          :key="item.id"
+          v-for="item in content" 
+          :key="item._id"
           :content="item"
           @view="viewContent"
+          @like="handleLike"
+          @bookmark="handleBookmark"
         />
       </div>
       
-      <div class="load-more" v-if="hasMoreContent && !loading">
+      <div class="load-more" v-if="pagination.page < pagination.pages && !loading">
         <button class="btn btn-outline" @click="loadMoreContent">
           Muat Lebih Banyak
         </button>
@@ -94,10 +107,13 @@
               {{ formatType(selectedContent.type) }}
             </div>
             <div class="content-category">{{ selectedContent.category }}</div>
+            <div v-if="selectedContent.difficulty" class="content-difficulty">
+              {{ formatDifficulty(selectedContent.difficulty) }}
+            </div>
           </div>
           
           <div v-if="selectedContent.type === 'video'" class="content-video">
-            <div class="video-placeholder">
+            <div class="video-placeholder" v-if="!selectedContent.videoUrl">
               <img :src="selectedContent.thumbnail" :alt="selectedContent.title" />
               <div class="play-button">
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
@@ -105,6 +121,10 @@
                 </svg>
               </div>
             </div>
+            <video v-else controls class="content-video-player">
+              <source :src="selectedContent.videoUrl" type="video/mp4">
+              Browser Anda tidak mendukung tag video.
+            </video>
           </div>
           
           <div v-else-if="selectedContent.type === 'infographic'" class="content-infographic">
@@ -112,27 +132,38 @@
           </div>
           
           <div class="content-details">
-            <p class="content-description">{{ selectedContent.fullDescription || selectedContent.description }}</p>
+            <p class="content-description">{{ selectedContent.fullContent || selectedContent.description }}</p>
             
             <div class="content-meta">
               <div class="content-author">
-                <img :src="selectedContent.authorAvatar" :alt="selectedContent.author" class="author-avatar" />
+                <img :src="selectedContent.author.avatar" :alt="selectedContent.author.name" class="author-avatar" />
                 <div class="author-info">
-                  <div class="author-name">{{ selectedContent.author }}</div>
-                  <div class="author-role">{{ selectedContent.authorRole }}</div>
+                  <div class="author-name">{{ selectedContent.author.name }}</div>
+                  <div class="author-role">{{ selectedContent.author.role }}</div>
                 </div>
               </div>
-              <div class="content-date">
-                Diterbitkan pada {{ selectedContent.date }}
+              <div class="content-stats">
+                <div class="content-date">
+                  Diterbitkan pada {{ formatDate(selectedContent.createdAt) }}
+                </div>
+                <div class="content-views">{{ selectedContent.views }} tayangan</div>
+                <div v-if="selectedContent.readTime" class="content-read-time">
+                  {{ selectedContent.readTime }} menit baca
+                </div>
               </div>
             </div>
             
             <div class="content-actions">
-              <button class="action-btn">
+              <button 
+                class="action-btn" 
+                :class="{ active: selectedContent.isLiked }"
+                @click="toggleLike(selectedContent._id)"
+                :disabled="actionLoading"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M5,9V21H1V9H5M9,21A2,2 0 0,1 7,19V9C7,8.45 7.22,7.95 7.59,7.59L14.17,1L15.23,2.06C15.5,2.33 15.67,2.7 15.67,3.11L15.64,3.43L14.69,8H21C22.11,8 23,8.9 23,10V12C23,12.26 22.95,12.5 22.86,12.73L19.84,19.78C19.54,20.5 18.83,21 18,21H9M9,19H18.03L21,12V10H12.21L13.34,4.68L9,9.03V19Z" />
                 </svg>
-                Berguna
+                {{ selectedContent.likeCount || 0 }}
               </button>
               <button class="action-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -140,7 +171,12 @@
                 </svg>
                 Bagikan
               </button>
-              <button class="action-btn">
+              <button 
+                class="action-btn" 
+                :class="{ active: selectedContent.isBookmarked }"
+                @click="toggleBookmark(selectedContent._id)"
+                :disabled="actionLoading"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z" />
                 </svg>
@@ -149,14 +185,54 @@
             </div>
           </div>
           
+          <!-- Comments Section -->
+          <div class="comments-section">
+            <h4>Komentar ({{ selectedContent.commentCount || 0 }})</h4>
+            
+            <div class="comment-form" v-if="$store.getters.isAuthenticated">
+              <textarea 
+                v-model="newComment" 
+                placeholder="Tulis komentar..."
+                rows="3"
+                :disabled="actionLoading"
+              ></textarea>
+              <button 
+                @click="addComment" 
+                class="btn btn-primary"
+                :disabled="!newComment.trim() || actionLoading"
+              >
+                Kirim Komentar
+              </button>
+            </div>
+            
+            <div class="comments-list">
+              <div 
+                v-for="comment in selectedContent.comments" 
+                :key="comment._id"
+                class="comment-item"
+              >
+                <img 
+                  :src="comment.author?.avatar || '/default-avatar.png'" 
+                  :alt="comment.author?.username" 
+                  class="comment-avatar" 
+                />
+                <div class="comment-content">
+                  <div class="comment-author">{{ comment.author?.username }}</div>
+                  <div class="comment-text">{{ comment.text }}</div>
+                  <div class="comment-date">{{ formatDate(comment.createdAt) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div class="related-content" v-if="relatedContent.length > 0">
             <h4>Materi Terkait</h4>
             <div class="related-items">
               <div 
                 v-for="item in relatedContent" 
-                :key="item.id"
+                :key="item._id"
                 class="related-item"
-                @click="viewContent(item.id)"
+                @click="viewContent(item._id)"
               >
                 <img :src="item.thumbnail" :alt="item.title" class="related-thumbnail" />
                 <div class="related-info">
@@ -174,6 +250,7 @@
 
 <script>
 import EduCard from '@/components/ecoedu/EduCard.vue'
+import { ecoEduService } from '@/services/EcoEduServices'
 
 export default {
   name: 'EcoEduView',
@@ -184,15 +261,24 @@ export default {
     return {
       content: [],
       loading: false,
+      actionLoading: false,
       searchQuery: '',
       activeTab: 'all',
       filters: {
         category: '',
-        sortBy: 'newest'
+        difficulty: '',
+        sort: '-createdAt'
       },
-      hasMoreContent: true,
-      page: 1,
+      pagination: {
+        page: 1,
+        limit: 12,
+        total: 0,
+        pages: 0
+      },
       selectedContent: null,
+      relatedContent: [],
+      newComment: '',
+      searchTimeout: null,
       tabs: [
         { value: 'all', label: 'Semua' },
         { value: 'article', label: 'Artikel' },
@@ -206,229 +292,217 @@ export default {
         'Pengelolaan Sampah',
         'Pertanian Berkelanjutan',
         'Biodiversitas'
-      ],
-      relatedContent: []
-    }
-  },
-  computed: {
-    filteredContent() {
-      let filtered = [...this.content]
-      
-      // Apply tab filter
-      if (this.activeTab !== 'all') {
-        filtered = filtered.filter(item => item.type === this.activeTab)
-      }
-      
-      // Apply category filter
-      if (this.filters.category) {
-        filtered = filtered.filter(item => item.category === this.filters.category)
-      }
-      
-      // Apply search filter
-      if (this.searchQuery.trim() !== '') {
-        const query = this.searchQuery.toLowerCase()
-        filtered = filtered.filter(item => 
-          item.title.toLowerCase().includes(query) || 
-          item.description.toLowerCase().includes(query) ||
-          item.category.toLowerCase().includes(query)
-        )
-      }
-      
-      // Apply sorting
-      switch (this.filters.sortBy) {
-        case 'newest':
-          filtered.sort((a, b) => new Date(b.publishedDate) - new Date(a.publishedDate))
-          break
-        case 'oldest':
-          filtered.sort((a, b) => new Date(a.publishedDate) - new Date(b.publishedDate))
-          break
-        case 'popular':
-          filtered.sort((a, b) => b.views - a.views)
-          break
-      }
-      
-      return filtered
+      ]
     }
   },
   created() {
     this.loadContent()
   },
   methods: {
-    async loadContent() {
+    async loadContent(loadMore = false) {
       this.loading = true
       
       try {
-        // Simulate API request with mock data
-        await new Promise(resolve => setTimeout(resolve, 800))
+        const params = {
+          page: loadMore ? this.pagination.page + 1 : 1,
+          limit: this.pagination.limit,
+          sort: this.filters.sort
+        }
         
-        // Mock data
-        const newContent = [
-          {
-            id: 1,
-            title: 'Mengapa Kita Harus Peduli Tentang Perubahan Iklim?',
-            description: 'Artikel ini menjelaskan dampak perubahan iklim pada ekosistem dan kehidupan manusia secara global dan di Indonesia.',
-            fullDescription: 'Perubahan iklim adalah perubahan jangka panjang dalam pola cuaca yang menjadi ciri khas dari lokasi tertentu. Hal ini disebabkan oleh peningkatan gas rumah kaca di atmosfer yang sebagian besar dihasilkan dari aktivitas manusia. Artikel ini menjelaskan dampak perubahan iklim pada ekosistem dan kehidupan manusia secara global dan di Indonesia.\n\nDampak perubahan iklim sudah mulai dirasakan di seluruh dunia, termasuk di Indonesia. Sebagai negara kepulauan, Indonesia sangat rentan terhadap kenaikan permukaan laut. Selain itu, perubahan pola cuaca dapat menyebabkan kekeringan, kebakaran hutan, dan banjir yang lebih parah.\n\nPenting bagi kita semua untuk memahami dan peduli tentang perubahan iklim karena akan mempengaruhi generasi saat ini dan masa depan. Dengan bertindak sekarang, kita dapat mengurangi dampak negatif dan menciptakan masa depan yang lebih berkelanjutan.',
-            type: 'article',
-            category: 'Perubahan Iklim',
-            thumbnail: '/src/assets/images/6.jpg',
-            author: 'Dr. Budi Setiawan',
-            authorRole: 'Peneliti Perubahan Iklim',
-            authorAvatar: '/src/assets/images/avatars/author1.jpg',
-            date: '15 Mei 2023',
-            publishedDate: '2023-05-15',
-            views: 1250,
-            likes: 345,
-            comments: 42
-          },
-          {
-            id: 2,
-            title: 'Teknik Daur Ulang Sampah Plastik di Rumah',
-            description: 'Video tutorial cara mendaur ulang berbagai jenis sampah plastik menjadi barang berguna dengan alat sederhana.',
-            fullDescription: 'Plastik adalah salah satu material yang paling banyak digunakan di dunia. Namun, plastik juga salah satu penyebab utama pencemaran lingkungan karena sulit terurai secara alami. Daur ulang adalah salah satu cara terbaik untuk mengatasi masalah sampah plastik.\n\nDalam video tutorial ini, Anda akan belajar cara mendaur ulang berbagai jenis sampah plastik menjadi barang-barang berguna dengan alat sederhana yang ada di rumah. Mulai dari botol plastik, kemasan makanan, hingga kantong plastik, semuanya dapat diubah menjadi pot tanaman, tempat pensil, tas, dan bahkan perhiasan unik.\n\nDengan mendaur ulang di rumah, Anda tidak hanya mengurangi sampah yang berakhir di tempat pembuangan, tetapi juga menghemat uang dan mengembangkan kreativitas. Mari mulai hidup lebih berkelanjutan dengan cara yang menyenangkan!',
-            type: 'video',
-            category: 'Pengelolaan Sampah',
-            thumbnail: '/src/assets/images/5.jpg',
-            author: 'Siti Nurhaliza',
-            authorRole: 'Aktivis Lingkungan',
-            authorAvatar: '/src/assets/images/avatars/author2.jpg',
-            date: '2 Juni 2023',
-            publishedDate: '2023-06-02',
-            views: 2840,
-            likes: 567,
-            comments: 89
-          },
-          {
-            id: 3,
-            title: 'Pentingnya Konservasi Air di Era Perubahan Iklim',
-            description: 'Infografis tentang pentingnya konservasi air dan berbagai metode sederhana untuk menghemat air dalam kehidupan sehari-hari.',
-            fullDescription: 'Air adalah sumber daya yang terbatas dan berharga. Meskipun 71% permukaan Bumi tertutup air, hanya 2.5% yang merupakan air tawar, dan hanya sebagian kecil dari itu yang dapat diakses untuk kebutuhan manusia. Dengan perubahan iklim dan populasi yang terus bertambah, konservasi air menjadi semakin penting.\n\nInfografis ini menjelaskan pentingnya konservasi air di era perubahan iklim dan memberikan berbagai metode sederhana untuk menghemat air dalam kehidupan sehari-hari. Dari perbaikan kebocoran, penggunaan air bekas untuk menyiram tanaman, hingga instalasi pemanen air hujan, setiap tindakan kecil dapat membuat perbedaan besar.\n\nMari kita jadikan konservasi air sebagai bagian dari gaya hidup kita untuk memastikan keberlanjutan sumber daya berharga ini bagi generasi mendatang.',
-            type: 'infographic',
-            category: 'Konservasi Air',
-            thumbnail: '/src/assets/images/4.jpg',
-            author: 'Hasan Hidayat',
-            authorRole: 'Konsultan Lingkungan',
-            authorAvatar: '/src/assets/images/avatars/author3.jpg',
-            date: '20 Juni 2023',
-            publishedDate: '2023-06-20',
-            views: 1680,
-            likes: 420,
-            comments: 35
-          },
-          {
-            id: 4,
-            title: 'Energi Terbarukan: Solusi untuk Masa Depan',
-            description: 'Artikel mendalam tentang berbagai jenis energi terbarukan dan potensinya untuk mengurangi ketergantungan pada bahan bakar fosil.',
-            fullDescription: 'Energi terbarukan adalah energi yang berasal dari sumber daya alam yang dapat diperbarui, seperti sinar matahari, angin, air, panas bumi, dan biomassa. Berbeda dengan bahan bakar fosil yang jumlahnya terbatas dan menghasilkan emisi karbon yang tinggi, energi terbarukan menawarkan solusi yang lebih berkelanjutan dan ramah lingkungan.\n\nDalam artikel ini, kita akan menjelajahi berbagai jenis energi terbarukan dan potensinya untuk mengurangi ketergantungan kita pada bahan bakar fosil. Indonesia, dengan lokasi geografisnya yang strategis di garis khatulistiwa, memiliki potensi besar untuk mengembangkan energi surya. Selain itu, sebagai negara kepulauan, Indonesia juga memiliki potensi untuk mengembangkan energi angin, arus laut, dan panas bumi.\n\nTransisi menuju energi terbarukan bukan hanya tentang mengurangi emisi karbon, tetapi juga tentang menciptakan ekonomi yang lebih berkelanjutan dan ketahanan energi yang lebih baik. Mari bergabung dalam perjalanan menuju masa depan yang lebih hijau dan berkelanjutan.',
-            type: 'article',
-            category: 'Energi Terbarukan',
-            thumbnail: '/src/assets/images/3.jpg',
-            author: 'Ir. Ahmad Fauzi',
-            authorRole: 'Pakar Energi Terbarukan',
-            authorAvatar: '/src/assets/images/avatars/author4.jpg',
-            date: '5 Juli 2023',
-            publishedDate: '2023-07-05',
-            views: 980,
-            likes: 210,
-            comments: 28
-          },
-          {
-            id: 5,
-            title: 'Cara Membuat Komposter Sederhana di Rumah',
-            description: 'Video tutorial lengkap untuk membuat komposter dari bahan bekas dan cara mengelolanya untuk menghasilkan pupuk organik berkualitas.',
-            fullDescription: 'Link video: https://www.youtube.com/watch?v=j0TFvT0mRlE \n\Kompos adalah pupuk organik yang dihasilkan dari proses penguraian bahan-bahan organik seperti sisa makanan, daun kering, dan limbah taman oleh mikroorganisme. Selain mengurangi jumlah sampah yang berakhir di tempat pembuangan, kompos juga dapat memperbaiki struktur tanah, meningkatkan retensi air, dan menyediakan nutrisi bagi tanaman.\n\nDalam video tutorial ini, Anda akan belajar cara membuat komposter sederhana dari bahan bekas yang mudah ditemukan di sekitar rumah. Mulai dari pemilihan wadah, penyiapan bahan kompos, hingga pemantauan dan pemeliharaan komposter, semua langkah akan dijelaskan secara detail dan mudah diikuti.\n\nDengan membuat dan mengelola komposter sendiri, Anda dapat mengurangi jejak karbon, menghemat uang untuk membeli pupuk, dan berkontribusi pada siklus nutrisi yang berkelanjutan. Mari mulai mengompos hari ini untuk Bumi yang lebih sehat besok!',
-            type: 'video',
-            category: 'Pertanian Berkelanjutan',
-            thumbnail: '/src/assets/images/2.jpg',
-            author: 'Dewi Lestari',
-            authorRole: 'Urban Farmer',
-            authorAvatar: '/src/assets/images/avatars/author5.jpg',
-            date: '18 Juli 2023',
-            publishedDate: '2023-07-18',
-            views: 1520,
-            likes: 380,
-            comments: 45
-          },
-          {
-            id: 6,
-            title: 'Keragaman Hayati Indonesia: Harta Karun yang Perlu Dilindungi',
-            description: 'Infografis komprehensif tentang kekayaan biodiversitas Indonesia, ancaman yang dihadapi, dan upaya konservasinya.',
-            fullDescription: 'Indonesia dikenal sebagai salah satu negara megabiodiversitas di dunia, yang berarti memiliki keanekaragaman hayati yang sangat tinggi. Dengan hanya sekitar 1,3% dari luas daratan dunia, Indonesia memiliki sekitar 17% dari total spesies yang ada di planet ini. Keragaman hayati ini mencakup beragam ekosistem, dari hutan hujan tropis hingga terumbu karang.\n\nInfografis ini menyajikan informasi komprehensif tentang kekayaan biodiversitas Indonesia, mulai dari jumlah spesies flora dan fauna, spesies endemik, hingga ekosistem unik yang dimiliki. Selain itu, infografis ini juga menggambarkan berbagai ancaman yang dihadapi oleh biodiversitas Indonesia, seperti deforestasi, perburuan liar, polusi, dan perubahan iklim.\n\nYang tak kalah penting, infografis ini juga menyoroti berbagai upaya konservasi yang dilakukan di Indonesia, baik oleh pemerintah, LSM, maupun masyarakat. Dengan memahami nilai dan tantangan biodiversitas Indonesia, kita dapat lebih termotivasi untuk melindungi harta karun alam ini.',
-            type: 'infographic',
-            category: 'Biodiversitas',
-            thumbnail: '/src/assets/images/1.jpg',
-            author: 'Dr. Ratna Sari',
-            authorRole: 'Ahli Biologi Konservasi',
-            authorAvatar: '/src/assets/images/avatars/author6.jpg',
-            date: '30 Juli 2023',
-            publishedDate: '2023-07-30',
-            views: 890,
-            likes: 195,
-            comments: 22
-          }
-        ]
+        if (this.activeTab !== 'all') {
+          params.type = this.activeTab
+        }
         
-        // If it's a new page, append the content, otherwise replace it
-        if (this.page === 1) {
-          this.content = newContent
+        if (this.filters.category) {
+          params.category = this.filters.category
+        }
+        
+        if (this.filters.difficulty) {
+          params.difficulty = this.filters.difficulty
+        }
+        
+        if (this.searchQuery.trim()) {
+          params.search = this.searchQuery.trim()
+        }
+        
+        const response = await ecoEduService.getContent(params)
+        
+        if (loadMore) {
+          this.content = [...this.content, ...response.content]
+          this.pagination.page += 1
         } else {
-          this.content = [...this.content, ...newContent]
+          this.content = response.content
+          this.pagination = response.pagination
         }
         
-        // Check if we've reached the end of available content
-        if (this.page >= 3) { // Simulate only having 3 pages
-          this.hasMoreContent = false
-        }
-        
-        this.page++
       } catch (error) {
         console.error('Error loading content:', error)
+        this.$toast.error(error.message || 'Gagal memuat konten')
       } finally {
         this.loading = false
       }
     },
+    
     loadMoreContent() {
-      this.loadContent()
+      this.loadContent(true)
     },
+    
     filterContent() {
-      // Reset pagination when filters change
-      this.page = 1
-      this.hasMoreContent = true
+      this.pagination.page = 1
       this.loadContent()
     },
+    
+    setActiveTab(tab) {
+      this.activeTab = tab
+      this.filterContent()
+    },
+    
+    debounceSearch() {
+      clearTimeout(this.searchTimeout)
+      this.searchTimeout = setTimeout(() => {
+        this.filterContent()
+      }, 500)
+    },
+    
     resetFilters() {
       this.searchQuery = ''
       this.activeTab = 'all'
       this.filters = {
         category: '',
-        sortBy: 'newest'
+        difficulty: '',
+        sort: '-createdAt'
       }
       this.filterContent()
     },
-    formatType(type) {
-      switch(type) {
-        case 'article':
-          return 'Artikel'
-        case 'video':
-          return 'Video'
-        case 'infographic':
-          return 'Infografis'
-        default:
-          return type
+    
+    async viewContent(contentId) {
+      try {
+        this.loading = true
+        const response = await ecoEduService.getSingleContent(contentId)
+        this.selectedContent = response.content
+        this.relatedContent = response.relatedContent || []
+      } catch (error) {
+        console.error('Error loading content:', error)
+        this.$toast.error(error.message || 'Gagal memuat konten')
+      } finally {
+        this.loading = false
       }
     },
-    viewContent(contentId) {
-      const content = this.content.find(item => item.id === contentId)
-      if (content) {
-        this.selectedContent = content
-        
-        // Find related content (same category or type)
-        this.relatedContent = this.content
-          .filter(item => 
-            item.id !== contentId && 
-            (item.category === content.category || item.type === content.type)
-          )
-          .slice(0, 3) // Limit to 3 related items
+    
+    async handleLike(contentId) {
+      if (!this.$store.getters.isAuthenticated) {
+        this.$toast.warning('Silakan login untuk menyukai konten')
+        return
       }
+      
+      await this.toggleLike(contentId)
+    },
+    
+    async handleBookmark(contentId) {
+      if (!this.$store.getters.isAuthenticated) {
+        this.$toast.warning('Silakan login untuk menyimpan konten')
+        return
+      }
+      
+      await this.toggleBookmark(contentId)
+    },
+    
+    async toggleLike(contentId) {
+      try {
+        this.actionLoading = true
+        const response = await ecoEduService.toggleLike(contentId)
+        
+        // Update local state
+        const contentIndex = this.content.findIndex(item => item._id === contentId)
+        if (contentIndex !== -1) {
+          this.content[contentIndex].isLiked = response.data.action === 'liked'
+          this.content[contentIndex].likeCount = response.data.likeCount
+        }
+        
+        if (this.selectedContent && this.selectedContent._id === contentId) {
+          this.selectedContent.isLiked = response.data.action === 'liked'
+          this.selectedContent.likeCount = response.data.likeCount
+        }
+        
+        this.$toast.success(response.message)
+      } catch (error) {
+        console.error('Error toggling like:', error)
+        this.$toast.error(error.message || 'Gagal mengubah status like')
+      } finally {
+        this.actionLoading = false
+      }
+    },
+    
+    async toggleBookmark(contentId) {
+      try {
+        this.actionLoading = true
+        const response = await ecoEduService.toggleBookmark(contentId)
+        
+        // Update local state
+        const contentIndex = this.content.findIndex(item => item._id === contentId)
+        if (contentIndex !== -1) {
+          this.content[contentIndex].isBookmarked = response.data.action === 'bookmarked'
+        }
+        
+        if (this.selectedContent && this.selectedContent._id === contentId) {
+          this.selectedContent.isBookmarked = response.data.action === 'bookmarked'
+        }
+        
+        this.$toast.success(response.message)
+      } catch (error) {
+        console.error('Error toggling bookmark:', error)
+        this.$toast.error(error.message || 'Gagal mengubah status bookmark')
+      } finally {
+        this.actionLoading = false
+      }
+    },
+    
+    async addComment() {
+      if (!this.newComment.trim()) return
+      
+      try {
+        this.actionLoading = true
+        const response = await ecoEduService.addComment(this.selectedContent._id, this.newComment.trim())
+        
+        // Add comment to local state
+        this.selectedContent.comments.push(response.data.comment)
+        this.selectedContent.commentCount = this.selectedContent.comments.length
+        
+        this.newComment = ''
+        this.$toast.success(response.message)
+      } catch (error) {
+        console.error('Error adding comment:', error)
+        this.$toast.error(error.message || 'Gagal menambahkan komentar')
+      } finally {
+        this.actionLoading = false
+      }
+    },
+    
+    formatType(type) {
+      const types = {
+        article: 'Artikel',
+        video: 'Video',
+        infographic: 'Infografis'
+      }
+      return types[type] || type
+    },
+    
+    formatDifficulty(difficulty) {
+      const difficulties = {
+        beginner: 'Pemula',
+        intermediate: 'Menengah',
+        advanced: 'Lanjut'
+      }
+      return difficulties[difficulty] || difficulty
+    },
+    
+    formatDate(dateString) {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
     }
   }
 }
@@ -446,6 +520,7 @@ export default {
 
 .page-title {
   margin-bottom: 0;
+  font-family: "Tagesschrift", system-ui;
 }
 
 .search-box {
@@ -484,11 +559,11 @@ export default {
 }
 
 .tab-btn {
-  background: none;
+  background: white;
   border: none;
   padding: 0.5rem 1.25rem;
   border-radius: var(--radius-full);
-  font-size: 0.875rem;
+  font-size: 0.975rem;
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;

@@ -1,3 +1,8 @@
+import API from '@/services/api'
+import axios from 'axios' // Tetap impor axios jika digunakan di tempat lain
+import { forestService } from '@/services/forestService'
+
+
 <template>
   <div class="forest-view">
     <div class="container">
@@ -59,38 +64,38 @@
           
           <template v-else>
             <!-- Grid View -->
-            <div v-if="viewMode === 'grid'" class="forest-grid">
-              <Tree 
-                v-for="tree in filteredTrees" 
-                :key="tree.id"
-                :id="tree.id"
-                :type="tree.type"
-                :plantedDate="tree.plantedDate"
-                :challenge="tree.challenge"
-                :label="tree.label"
-                :description="tree.description"
-              />
-            </div>
+        <div v-if="viewMode === 'grid'" class="forest-grid">
+            <Tree 
+              v-for="tree in filteredTrees" 
+              :key="tree?.id || 'default-key-' + index" 
+              :id="tree?.id"
+              :type="tree?.type"
+              :plantedDate="tree?.plantedDate"
+              :challenge="tree?.challenge"
+              :label="tree?.label"
+              :description="tree?.description"
+            />
+          </div>
             
             <!-- List View -->
             <div v-else class="forest-list">
-              <div v-for="tree in filteredTrees" :key="tree.id" class="tree-list-item">
-                <div class="tree-list-icon">
-                  <Tree :type="tree.type" :id="tree.id" :plantedDate="tree.plantedDate" />
-                </div>
-                <div class="tree-list-info">
-                  <div class="tree-list-header">
-                    <h3 class="tree-list-title">{{ tree.label || 'Pohon #' + tree.id }}</h3>
-                    <div class="tree-list-date">Ditanam pada {{ formatDate(tree.plantedDate) }}</div>
-                  </div>
-                  <p class="tree-list-description">{{ tree.description || 'Tidak ada deskripsi' }}</p>
-                  <div class="tree-list-meta">
-                    <div class="tree-list-type">{{ getTreeTypeLabel(tree.type) }}</div>
-                    <div class="tree-list-challenge">{{ tree.challenge }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+  <div v-for="(tree, index) in filteredTrees" :key="tree?.id || 'default-key-' + index" class="tree-list-item">
+    <div class="tree-list-icon">
+      <Tree :type="tree?.type" :id="tree?.id" :plantedDate="tree?.plantedDate" />
+    </div>
+    <div class="tree-list-info">
+      <div class="tree-list-header">
+        <h3 class="tree-list-title">{{ tree?.label || 'Pohon #' + (tree?.id || index + 1) }}</h3>
+        <div class="tree-list-date">Ditanam pada {{ tree?.plantedDate ? formatDate(tree.plantedDate) : '-' }}</div>
+      </div>
+      <p class="tree-list-description">{{ tree?.description || 'Tidak ada deskripsi' }}</p>
+      <div class="tree-list-meta">
+        <div class="tree-list-type">{{ getTreeTypeLabel(tree?.type) }}</div>
+        <div class="tree-list-challenge">{{ tree?.challenge }}</div>
+      </div>
+    </div>
+  </div>
+</div>
           </template>
         </main>
       </div>
@@ -146,16 +151,7 @@
             </div>
           </div>
           
-          <div class="form-group">
-            <label for="tree-challenge" class="form-label">Untuk Tantangan</label>
-            <select id="tree-challenge" class="form-control" v-model="newTree.challenge">
-              <option value="Tantangan Tanam Pohon">Tantangan Tanam Pohon</option>
-              <option value="Tanam 5 Pohon">Tanam 5 Pohon</option>
-              <option value="Penghijauan Kota">Penghijauan Kota</option>
-              <option value="Hutan Mini">Hutan Mini</option>
-              <option value="Inisiatif Pribadi">Inisiatif Pribadi</option>
-            </select>
-          </div>
+        
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" @click="showPlantModal = false">Batal</button>
@@ -180,7 +176,10 @@
   </div>
 </template>
 
+
+
 <script>
+import axios from 'axios'
 import { mapGetters } from 'vuex'
 import Tree from '@/components/forest/Tree.vue'
 import ForestStats from '@/components/forest/ForestStats.vue'
@@ -218,55 +217,30 @@ export default {
     forestStats() {
       return {
         treeCount: this.trees.length,
-        carbonOffset: this.trees.length * 21, // Approximate kg of CO2 per tree per year
+        carbonOffset: this.trees.length * 21,
         forestLevel: Math.floor(this.trees.length / 5) + 1,
-        lastTreeDate: this.trees.length > 0 ? this.formatDate(this.trees[0].plantedDate) : '-',
+        lastTreeDate: this.trees.length > 0 && this.trees[0].plantedDate ? this.formatDate(this.trees[0].plantedDate) : '-',
         nextLevelProgress: ((this.trees.length % 5) / 5) * 100,
         treesToNextLevel: 5 - (this.trees.length % 5),
         achievements: [
-          {
-            name: 'Penemu Hutan',
-            description: 'Tanam pohon pertamamu',
-            achieved: this.trees.length >= 1
-          },
-          {
-            name: 'Kebun Mini',
-            description: 'Tanam 5 pohon',
-            achieved: this.trees.length >= 5
-          },
-          {
-            name: 'Tukang Kebun',
-            description: 'Tanam 10 pohon',
-            achieved: this.trees.length >= 10
-          },
-          {
-            name: 'Kolektor Pohon',
-            description: 'Tanam setiap jenis pohon',
-            achieved: this.hasAllTreeTypes()
-          },
-          {
-            name: 'Penghijauan',
-            description: 'Tanam 25 pohon',
-            achieved: this.trees.length >= 25
-          }
+          { name: 'Penemu Hutan', description: 'Tanam pohon pertamamu', achieved: this.trees.length >= 1 },
+          { name: 'Kebun Mini', description: 'Tanam 5 pohon', achieved: this.trees.length >= 5 },
+          { name: 'Tukang Kebun', description: 'Tanam 10 pohon', achieved: this.trees.length >= 10 },
+          { name: 'Kolektor Pohon', description: 'Tanam setiap jenis pohon', achieved: this.hasAllTreeTypes() },
+          { name: 'Penghijauan', description: 'Tanam 25 pohon', achieved: this.trees.length >= 25 }
         ]
       }
     },
     filteredTrees() {
       let filtered = [...this.trees]
-      
-      // Apply tree type filter
       if (this.filters.treeType) {
         filtered = filtered.filter(tree => tree.type === this.filters.treeType)
       }
-      
-      // Apply sorting
       if (this.filters.sortBy === 'newest') {
         filtered.sort((a, b) => new Date(b.plantedDate) - new Date(a.plantedDate))
       } else {
         filtered.sort((a, b) => new Date(a.plantedDate) - new Date(b.plantedDate))
       }
-      
       return filtered
     }
   },
@@ -275,61 +249,51 @@ export default {
   },
   methods: {
     async loadTrees() {
-      this.loading = true
-      
-      try {
-        // Simulate API request with mock data
-        await new Promise(resolve => setTimeout(resolve, 800))
-        
-        // Mock data
-        this.trees = [
-          {
-            id: 1,
-            type: 'pine',
-            plantedDate: '2023-06-01',
-            challenge: 'Tantangan Tanam Pohon',
-            label: 'Pohon Harapan',
-            description: 'Pohon pertama di hutan virtualku. Ditanam untuk menandai awal perjalanan hijau.'
-          },
-          {
-            id: 2,
-            type: 'oak',
-            plantedDate: '2023-06-03',
-            challenge: 'Tanam 5 Pohon',
-            label: 'Pohon Kekuatan',
-            description: 'Pohon ek yang kuat sebagai simbol ketahanan melawan perubahan iklim.'
-          },
-          {
-            id: 3,
-            type: 'maple',
-            plantedDate: '2023-06-05',
-            challenge: 'Tanam 5 Pohon',
-            label: 'Pohon Perubahan',
-            description: 'Seperti daun maple yang berubah warna, kita juga harus berubah untuk Bumi yang lebih baik.'
-          },
-          {
-            id: 4,
-            type: 'pine',
-            plantedDate: '2023-06-08',
-            challenge: 'Tanam 5 Pohon',
-            label: '',
-            description: ''
-          },
-          {
-            id: 5,
-            type: 'oak',
-            plantedDate: '2023-06-10',
-            challenge: 'Tanam 5 Pohon',
-            label: 'Pohon Persahabatan',
-            description: 'Ditanam bersama teman-teman sebagai simbol persahabatan yang abadi.'
-          }
-        ]
-      } catch (error) {
-        console.error('Error loading trees:', error)
-      } finally {
-        this.loading = false
+  this.loading = true
+  const token = localStorage.getItem('ecoquest_token')
+
+  if (!token) {
+    this.$store.dispatch('addNotification', {
+      type: 'error',
+      message: 'Token tidak ditemukan. Silakan login kembali.',
+      timeout: 5000
+    })
+    this.loading = false
+    this.$router.push('/login')
+    return
+  }
+
+  try {
+    const response = await axios.get('/api/forest', {
+      headers: {
+        Authorization: `Bearer ${token}`
       }
-    },
+    })
+
+    if (response.data.status === 'success' && response.data.data?.forest) {
+      this.trees = response.data.data.forest.trees || []
+    } else {
+      this.trees = response.data.forest?.trees || response.data.trees || []
+    }
+  } catch (error) {
+    let errorMessage = 'Gagal memuat data hutan. Coba lagi nanti.'
+    if (error.response?.status === 401) {
+      errorMessage = 'Sesi telah berakhir. Silakan login kembali.'
+      this.$router.push('/login')
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    }
+
+    this.$store.dispatch('addNotification', {
+      type: 'error',
+      message: errorMessage,
+      timeout: 5000
+    })
+  } finally {
+    this.loading = false
+  }
+}
+,
     formatDate(dateString) {
       const date = new Date(dateString)
       return date.toLocaleDateString('id-ID', {
@@ -340,75 +304,116 @@ export default {
     },
     getTreeTypeLabel(type) {
       switch(type) {
-        case 'pine':
-          return 'Pohon Pinus'
-        case 'oak':
-          return 'Pohon Ek'
-        case 'maple':
-          return 'Pohon Maple'
-        default:
-          return 'Pohon'
+        case 'pine': return 'Pohon Pinus'
+        case 'oak': return 'Pohon Ek'
+        case 'maple': return 'Pohon Maple'
+        default: return 'Pohon'
       }
     },
     hasAllTreeTypes() {
       const types = this.trees.map(tree => tree.type)
       return ['pine', 'oak', 'maple'].every(type => types.includes(type))
     },
-    plantTree() {
-      // Create a new tree
-      const now = new Date()
-      const newTreeId = this.trees.length > 0 ? Math.max(...this.trees.map(t => t.id)) + 1 : 1
-      
-      const tree = {
-        id: newTreeId,
-        type: this.newTree.type,
-        plantedDate: now.toISOString().split('T')[0],
-        challenge: this.newTree.challenge,
-        label: this.newTree.label,
-        description: this.newTree.description
-      }
-      
-      // Add to trees array
-      this.trees.unshift(tree)
-      
-      // Update planted tree for animation
-      this.plantedTree = tree
-      
-      // Show animation
-      this.showPlantModal = false
-      this.showPlantAnimation = true
-      
-      // Update user statistics
-      this.$store.dispatch('user/updateStatistics', {
-        treesPlanted: this.userStatistics.treesPlanted + 1
-      })
-      
-      // Add points for planting a tree
-      this.$store.dispatch('user/updateUserPoints', 50)
-      
-      // Show notification
+    async plantTree() {
+  try {
+    const token = localStorage.getItem('ecoquest_token')
+
+    if (!token) {
       this.$store.dispatch('addNotification', {
-        type: 'success',
-        message: 'Pohon baru berhasil ditanam! +50 poin',
+        type: 'error',
+        message: 'Token tidak ditemukan. Silakan login kembali.',
         timeout: 5000
       })
-      
-      // Reset new tree form
-      this.newTree = {
-        type: 'pine',
-        label: '',
-        description: '',
-        challenge: 'Tantangan Tanam Pohon'
-      }
-      
-      // Hide animation after delay
-      setTimeout(() => {
-        this.showPlantAnimation = false
-      }, 3000)
+      this.$router.push('/login')
+      return
     }
+
+    const response = await axios.post('/api/forest/plant', {
+      type: this.newTree.type,
+      label: this.newTree.label,
+      description: this.newTree.description
+    }, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    let tree = null
+    if (response.data.status === 'success' && response.data.data?.tree) {
+      tree = response.data.data.tree
+    } else if (response.data.tree) {
+      tree = response.data.tree
+    } else {
+      throw new Error('Data pohon tidak ditemukan dalam response API')
+    }
+
+    if (!tree.id || !tree.plantedDate || !tree.type) {
+      throw new Error('Data pohon dari API tidak lengkap')
+    }
+
+    this.trees = [tree, ...this.trees]
+    this.plantedTree = tree
+    this.showPlantModal = false
+    this.showPlantAnimation = true
+
+    this.$store.dispatch('user/updateStatistics', {
+      treesPlanted: this.userStatistics.treesPlanted + 1
+    })
+
+    const pointsEarned = response.data.data?.pointsEarned || 50
+    this.$store.dispatch('user/updateUserPoints', pointsEarned)
+
+    this.$store.dispatch('addNotification', {
+      type: 'success',
+      message: `Pohon baru berhasil ditanam! +${pointsEarned} poin`,
+      timeout: 5000
+    })
+
+    if (response.data.data?.newAchievements?.length > 0) {
+      response.data.data.newAchievements.forEach(achievement => {
+        this.$store.dispatch('addNotification', {
+          type: 'achievement',
+          message: `🏆 Achievement unlocked: ${achievement.name}!`,
+          timeout: 7000
+        })
+      })
+    }
+
+    this.newTree = {
+      type: 'pine',
+      label: '',
+      description: '',
+      challenge: 'Tantangan Tanam Pohon'
+    }
+
+    setTimeout(() => {
+      this.showPlantAnimation = false
+    }, 3000)
+
+  } catch (error) {
+    let errorMessage = 'Gagal menanam pohon. Coba lagi.'
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Sesi telah berakhir. Silakan login kembali.'
+      this.$router.push('/login')
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+
+    this.$store.dispatch('addNotification', {
+      type: 'error',
+      message: errorMessage,
+      timeout: 5000
+    })
+  }
+}
+
   }
 }
 </script>
+
 
 <style scoped>
 .page-header {
@@ -422,6 +427,7 @@ export default {
 
 .page-title {
   margin-bottom: 0;
+  font-family: "Tagesschrift", system-ui;
 }
 
 .page-actions {

@@ -1,123 +1,130 @@
+import { authService } from '@/services/authService';
+
 export default {
-    namespaced: true,
-    state: {
-      currentUser: {
-        id: 'user123',
-        username: 'RazaWarior',
-        avatar: 'https://ui-avatars.com/api/?name=Raza+Warrior&background=random',
-        level: 5,
-        totalPoints: 1250,
-        badges: ['tree-lover', 'recycling-master'],
-        rank: 8
-      },
-      isAuthenticated: true,
-      completedChallenges: [
-        { id: 'ch1', date: '2023-05-01', points: 50 },
-        { id: 'ch3', date: '2023-05-02', points: 75 },
-        { id: 'ch7', date: '2023-05-05', points: 100 }
-      ],
-      statistics: {
-        treesPlanted: 12,
-        wasteRecycled: 45,
-        waterSaved: 120,
-        challengesCompleted: 15
+  namespaced: true,
+  state: {
+    currentUser: null,
+    isAuthenticated: false,
+    completedChallenges: [],
+    statistics: {
+      challengesCompleted: 0,
+      treesPlanted: 0,
+      wasteRecycled: 0,
+      waterSaved: 0
+    }
+  },
+  getters: {
+    getCurrentUser: state => state.currentUser,
+    isAuthenticated: state => state.isAuthenticated,
+    isAdmin: state => state.currentUser?.role === 'admin' || false,
+    getCompletedChallenges: state => state.completedChallenges,
+    getUserStatistics: state => state.statistics,
+    getUserLevel: state => state.currentUser?.gameStats?.level || 1,
+    getUserBadges: state => state.currentUser?.gameStats?.badges || [],
+    getUserPoints: state => state.currentUser?.gameStats?.totalPoints || 0,
+    getUserRank: state => state.currentUser?.gameStats?.rank || 0
+  },
+  mutations: {
+    SET_USER(state, user) {
+      state.currentUser = user;
+      state.isAuthenticated = !!user;
+      if (user) {
+        state.statistics = user.statistics;
       }
     },
-    getters: {
-      getCurrentUser: state => state.currentUser,
-      isAuthenticated: state => state.isAuthenticated,
-      getCompletedChallenges: state => state.completedChallenges,
-      getUserStatistics: state => state.statistics,
-      getUserLevel: state => state.currentUser.level,
-      getUserBadges: state => state.currentUser.badges,
-      getUserPoints: state => state.currentUser.totalPoints,
-      getUserRank: state => state.currentUser.rank
+    SET_AUTHENTICATION(state, status) {
+      state.isAuthenticated = status;
     },
-    mutations: {
-      SET_USER(state, user) {
-        state.currentUser = user
-      },
-      SET_AUTHENTICATION(state, status) {
-        state.isAuthenticated = status
-      },
-      ADD_COMPLETED_CHALLENGE(state, challenge) {
-        state.completedChallenges.push(challenge)
-      },
-      UPDATE_STATISTICS(state, newStats) {
-        state.statistics = { ...state.statistics, ...newStats }
-      },
-      UPDATE_USER_POINTS(state, points) {
-        state.currentUser.totalPoints += points
-        
-        // Update level based on points (simple calculation)
-        state.currentUser.level = Math.floor(state.currentUser.totalPoints / 250) + 1
-      },
-      ADD_BADGE(state, badge) {
-        if (!state.currentUser.badges.includes(badge)) {
-          state.currentUser.badges.push(badge)
-        }
+    CLEAR_USER(state) {
+      state.currentUser = null;
+      state.isAuthenticated = false;
+      state.completedChallenges = [];
+      state.statistics = {
+        challengesCompleted: 0,
+        treesPlanted: 0,
+        wasteRecycled: 0,
+        waterSaved: 0
+      };
+    },
+    UPDATE_USER_STATS(state, stats) {
+      if (state.currentUser) {
+        state.currentUser.statistics = { ...state.currentUser.statistics, ...stats };
+        state.statistics = { ...state.statistics, ...stats };
       }
     },
-    actions: {
-      login({ commit }, userData) {
-        // Simulate API call
-        return new Promise(resolve => {
-          setTimeout(() => {
-            commit('SET_USER', userData)
-            commit('SET_AUTHENTICATION', true)
-            resolve(userData)
-          }, 1000)
-        })
-      },
-      logout({ commit }) {
-        commit('SET_USER', {})
-        commit('SET_AUTHENTICATION', false)
-      },
-      completeChallenge({ commit, state }, challenge) {
-        // Add to completed challenges
-        const completedChallenge = {
-          id: challenge.id,
-          date: new Date().toISOString().split('T')[0],
-          points: challenge.points
-        }
-        commit('ADD_COMPLETED_CHALLENGE', completedChallenge)
-        
-        // Update user points
-        commit('UPDATE_USER_POINTS', challenge.points)
-        
-        // Update statistics based on challenge type
-        const newStats = {}
-        if (challenge.type === 'tree') {
-          newStats.treesPlanted = state.statistics.treesPlanted + 1
-        } else if (challenge.type === 'recycle') {
-          newStats.wasteRecycled = state.statistics.wasteRecycled + challenge.amount
-        } else if (challenge.type === 'water') {
-          newStats.waterSaved = state.statistics.waterSaved + challenge.amount
-        }
-        
-        newStats.challengesCompleted = state.statistics.challengesCompleted + 1
-        commit('UPDATE_STATISTICS', newStats)
-        
-        // Check for badges
-        this.dispatch('user/checkForBadges')
-      },
-      checkForBadges({ commit, state }) {
-        // Simple badge logic based on statistics
-        if (state.statistics.treesPlanted >= 10 && !state.currentUser.badges.includes('tree-lover')) {
-          commit('ADD_BADGE', 'tree-lover')
-        }
-        
-        if (state.statistics.wasteRecycled >= 50 && !state.currentUser.badges.includes('recycling-master')) {
-          commit('ADD_BADGE', 'recycling-master')
-        }
-        
-        if (state.statistics.waterSaved >= 100 && !state.currentUser.badges.includes('water-saver')) {
-          commit('ADD_BADGE', 'water-saver')
-        }
-        
-        if (state.statistics.challengesCompleted >= 20 && !state.currentUser.badges.includes('challenge-champion')) {
-          commit('ADD_BADGE', 'challenge-champion')
-        }
+    UPDATE_USER_POINTS(state, points) {
+      if (state.currentUser) {
+        state.currentUser.gameStats.totalPoints += points;
+        // Update level based on points
+        state.currentUser.gameStats.level = Math.floor(state.currentUser.gameStats.totalPoints / 250) + 1;
+      }
+    },
+    ADD_BADGE(state, badge) {
+      if (state.currentUser && !state.currentUser.gameStats.badges.some(b => b.name === badge.name)) {
+        state.currentUser.gameStats.badges.push(badge);
       }
     }
+  },
+  actions: {
+    async initializeAuth({ commit }) {
+      if (authService.isAuthenticated()) {
+        try {
+          const user = await authService.getCurrentUser();
+          commit('SET_USER', user);
+        } catch (error) {
+          console.error('Failed to initialize auth:', error);
+          authService.logout();
+        }
+      }
+    },
+
+    async login({ commit }, { email, password }) {
+      try {
+        const response = await authService.login(email, password);
+        commit('SET_USER', response.data.user);
+        return response;
+      } catch (error) {
+        throw error;
+      }
+    },
+
+    // PERBAIKAN: Register tidak boleh langsung set user sebagai authenticated
+    async register({ commit }, userData) {
+      try {
+        const response = await authService.register(userData);
+        // JANGAN commit SET_USER di sini
+        // Biarkan user harus login manual setelah register
+        return response;
+      } catch (error) {
+        throw error;
+      }
+    },
+
+    async logout({ commit }) {
+      await authService.logout();
+      commit('CLEAR_USER');
+    },
+
+    async updateProfile({ commit }, profileData) {
+      try {
+        const response = await authService.updateProfile(profileData);
+        commit('SET_USER', response.data.user);
+        return response;
+      } catch (error) {
+        throw error;
+      }
+    },
+
+    updateUserPoints({ commit }, points) {
+      commit('UPDATE_USER_POINTS', points);
+    },
+
+    updateStatistics({ commit }, stats) {
+      commit('UPDATE_USER_STATS', stats);
+    },
+
+    addBadge({ commit }, badge) {
+      commit('ADD_BADGE', badge);
+    }
   }
+};

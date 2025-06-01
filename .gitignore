@@ -1,24 +1,40 @@
-# Logs
-logs
+# Node modules
+node_modules/
+ecoquest-backend/node_modules/
+
+# Log & debug files
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Environment & config lokal
+.env
+ecoquest-backend/.env
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# VS Code settings
+.vscode/
+
+# Output atau file sementara
+dist/
+build/
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Mac / Windows sistem file
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+
+# File struktur dan hasil generate
+struktur.txt
+struktur_folder.txt
+README.mdgit
+
+# Coverage test (jika pakai Jest/nyc/etc)
+coverage/
+.nyc_output/
+
+# Lainnya yang tidak perlu di commit
+*.local
+*.sublime-workspace
+*.sublime-project

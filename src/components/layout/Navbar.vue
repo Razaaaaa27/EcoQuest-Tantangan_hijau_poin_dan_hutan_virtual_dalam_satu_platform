@@ -1,5 +1,5 @@
 <template>
-  <nav class="navbar">
+  <nav v-if="!isAdmin" class="navbar">
     <div class="container navbar-container">
       <router-link to="/" class="navbar-logo">
         <img src="@/assets/images/logo2.svg" alt="EcoQuest Logo" />
@@ -35,7 +35,6 @@
     </div>
   </nav>
 </template>
-
 <script>
 import { mapGetters, mapActions } from 'vuex'
 
@@ -65,6 +64,9 @@ export default {
       return this.currentUser && this.currentUser.avatar 
         ? this.currentUser.avatar 
         : '/src/assets/images/avatars/default.jpg'
+    },
+    isAdmin() {
+      return this.currentUser && this.currentUser.role === 'admin'
     }
   },
   methods: {

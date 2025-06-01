@@ -15,20 +15,7 @@
           Lihat Papan Skor
         </router-link>
       </div>
-      <div class="hero-stats">
-        <div class="hero-stat-item">
-          <div class="hero-stat-number">{{ formatNumber(globalStats.treesPlanted) }}</div>
-          <div class="hero-stat-label">Pohon Ditanam</div>
-        </div>
-        <div class="hero-stat-item">
-          <div class="hero-stat-number">{{ formatNumber(globalStats.usersCount) }}</div>
-          <div class="hero-stat-label">Ecowarrior</div>
-        </div>
-        <div class="hero-stat-item">
-          <div class="hero-stat-number">{{ formatNumber(globalStats.challengesCompleted) }}</div>
-          <div class="hero-stat-label">Tantangan Selesai</div>
-        </div>
-      </div>
+    
     </div>
     <div class="hero-image">
       <img src="https://i.pinimg.com/originals/0f/a3/da/0fa3dafffb04721fe538596eef9247c7.gif" alt="EcoQuest Hero" />
@@ -57,18 +44,25 @@ export default {
 }
 </script>
 
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,100..900;1,100..900&family=Pacifico&family=Tagesschrift&display=swap');
+</style>
+
 <style scoped>
 .hero {
+  background-color: var(--bg-secondary); /* Gunakan variabel yang sudah ada */
   position: relative;
-  min-height: .550px;
+  min-height: 550px;
   display: flex;
   align-items: center;
   overflow: hidden;
-  background-color: #f0f8f1;
   border-radius: var(--radius-lg);
   margin-bottom: 4rem;
-  margin-top:2rem;
+  margin-top: 2rem;
+  transition: background-color 0.3s ease;
 }
+
+
 
 .hero-content {
   position: relative;
@@ -77,7 +71,9 @@ export default {
   max-width: 600px;
 }
 
+
 .hero-title {
+ font-family: "Tagesschrift", system-ui;
   font-size: 2.5rem;
   line-height: 1.2;
   margin-bottom: 1.5rem;

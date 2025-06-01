@@ -172,6 +172,7 @@ export default {
 .featured-challenge-title {
   font-size: 1.75rem;
   margin-bottom: 1rem;
+  font-family: "Tagesschrift", system-ui;
 }
 
 .featured-challenge-description {

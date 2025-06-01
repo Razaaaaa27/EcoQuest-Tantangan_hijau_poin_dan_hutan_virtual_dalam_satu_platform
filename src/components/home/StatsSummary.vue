@@ -111,6 +111,7 @@ export default {
 .stats-summary-title {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
+  font-family: "Tagesschrift", system-ui;
 }
 
 .stats-grid {

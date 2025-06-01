@@ -16,6 +16,7 @@
 - **Routing**: Vue Router
 - **State Management**: Vuex
 - **Bundler**: Vite
+- **Backend**: Node.js (Express)
 
 ## 📦 Instalasi
 
@@ -27,11 +28,13 @@ cd EcoQuest
 # Install Vue CLI (jika belum terpasang secara global)
 npm install -g @vue/cli
 
-# Install dependencies
+# Install dependencies frontend
 npm install
 ```
 
 ## 🧪 Menjalankan Proyek
+
+### Frontend
 
 ```bash
 # Jalankan mode pengembangan
@@ -44,10 +47,21 @@ npm run build
 npm run preview
 ```
 
+### Backend
+
+```bash
+# Masuk ke direktori backend
+cd ecoquest-backend
+
+# Jalankan server backend
+node server.js
+```
+
 ## 📁 Struktur Direktori
 
 ```
 EcoQuest/
+├── ecoquest-backend/     # Direktori backend (Node.js)
 ├── public/               # File publik
 ├── src/                  # Source code utama
 │   ├── components/       # Komponen Vue
@@ -55,7 +69,7 @@ EcoQuest/
 │   ├── store/            # Vuex Store
 │   └── main.js           # Entry point aplikasi
 ├── index.html            # HTML utama
-├── package.json          # Info proyek & dependencies
+├── package.json          # Info proyek & dependencies frontend
 └── vite.config.js        # Konfigurasi Vite
 ```
 

@@ -92,6 +92,9 @@ import ChallengeCard from '@/components/Challenges/ChallengeCard.vue'
 import ChallengeFilter from '@/components/challenges/ChallengeFilter.vue'
 import { challengeService } from '@/services/challengeService'
 
+
+
+
 export default {
   name: 'ChallengesView',
   components: {

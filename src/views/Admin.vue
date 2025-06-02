@@ -588,7 +588,7 @@
 
 <script>
 import { mapGetters } from 'vuex'
-import { adminService } from '@/services/adminservice'
+import { adminservice } from '@/services/adminservice'
 
 export default {
   name: 'AdminDashboard',

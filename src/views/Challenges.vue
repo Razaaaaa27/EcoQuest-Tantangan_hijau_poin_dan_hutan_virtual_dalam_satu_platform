@@ -88,7 +88,7 @@
 </template>
 <script>
 import { mapActions, mapGetters } from 'vuex'
-import ChallengeCard from '@/components/challenges/ChallengeCard.vue'
+import ChallengeCard from '@/components/Challenges/ChallengeCard.vue'
 import ChallengeFilter from '@/components/challenges/ChallengeFilter.vue'
 import { challengeService } from '@/services/challengeService'
 
